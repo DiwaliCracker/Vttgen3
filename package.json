@@ -1,0 +1,15 @@
+{
+  "name": "vtt-generator",
+  "version": "1.0.0",
+  "description": "Generate sprite image and VTT from a video URL",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "fluent-ffmpeg": "^2.1.2",
+    "node-fetch": "^3.3.2"
+  },
+  "type": "module"
+}

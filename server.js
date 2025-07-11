@@ -8,33 +8,30 @@ import { exec } from 'child_process';
 
 const app = express();
 const port = process.env.PORT || 8080;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use('/output', express.static('public'));
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Home page: input form
 app.get('/', (req, res) => {
   res.send(`
     <form method="POST" action="/generate">
       <input type="text" name="videoUrl" placeholder="Enter video URL" style="width:300px" required />
-      <button type="submit">Generate Thumbnails</button>
+      <button type="submit">Generate</button>
     </form>
   `);
 });
 
-// Processing route
 app.post('/generate', async (req, res) => {
   const videoUrl = req.body.videoUrl;
   const inputFile = path.join(__dirname, 'input.mp4');
-  const outputFolder = path.join(__dirname, 'public');
-  const spritePath = path.join(outputFolder, 'sprite.jpg');
-  const vttPath = path.join(outputFolder, 'thumbnails.vtt');
+  const outputDir = path.join(__dirname, 'public');
+  const spritePath = path.join(outputDir, 'sprite.jpg');
+  const vttPath = path.join(outputDir, 'thumbnails.vtt');
 
   try {
-    // Download video
     const response = await fetch(videoUrl);
     const fileStream = fs.createWriteStream(inputFile);
     await new Promise((resolve, reject) => {
@@ -43,17 +40,13 @@ app.post('/generate', async (req, res) => {
       fileStream.on("finish", resolve);
     });
 
-    // Run FFmpeg to generate sprite
-    const ffmpegCommand = `ffmpeg -i "${inputFile}" -vsync vfr -vf "select='isnan(prev_selected_t)+gte(t-prev_selected_t\\,10)',scale=160:90,tile=10x10" -qscale:v 2 "${spritePath}"`;
+    const cmd = `ffmpeg -i "${inputFile}" -vsync vfr -vf "select='isnan(prev_selected_t)+gte(t-prev_selected_t\\,10)',scale=160:90,tile=10x10" -qscale:v 2 "${spritePath}"`;
 
-    exec(ffmpegCommand, (error) => {
-      if (error) {
-        res.send("FFmpeg failed: " + error.message);
-        return;
-      }
+    exec(cmd, (err) => {
+      if (err) return res.send("FFmpeg error: " + err.message);
 
-      // Generate VTT
-      const vttLines = [];
+      // Generate thumbnails.vtt
+      const vtt = ["WEBVTT\n"];
       let count = 0;
       for (let y = 0; y < 10; y++) {
         for (let x = 0; x < 10; x++) {
@@ -61,28 +54,32 @@ app.post('/generate', async (req, res) => {
           const end = start + 10;
           const left = x * 160;
           const top = y * 90;
-          vttLines.push(
-            `${new Date(start * 1000).toISOString().substr(11, 8)}.000 --> ${new Date(end * 1000).toISOString().substr(11, 8)}.000\nsprite.jpg#xywh=${left},${top},160,90\n`
-          );
+          vtt.push(`${formatTime(start)}.000 --> ${formatTime(end)}.000\nsprite.jpg#xywh=${left},${top},160,90\n`);
           count++;
         }
       }
-
-      fs.writeFileSync(vttPath, "WEBVTT\n\n" + vttLines.join("\n"));
-      fs.unlinkSync(inputFile); // cleanup input file
+      fs.writeFileSync(vttPath, vtt.join('\n'));
+      fs.unlinkSync(inputFile);
 
       res.send(`
-        ✅ Thumbnails Generated!<br><br>
+        ✅ Done!<br><br>
         <a href="/output/sprite.jpg" target="_blank">View Sprite</a><br>
         <a href="/output/thumbnails.vtt" target="_blank">View VTT</a><br><br>
-        <a href="/">← Generate Another</a>
+        <a href="/">← Try another</a>
       `);
     });
   } catch (e) {
-    res.send("❌ Failed to download or process video: " + e.message);
+    res.send("❌ Error: " + e.message);
   }
 });
 
+function formatTime(seconds) {
+  const hrs = String(Math.floor(seconds / 3600)).padStart(2, '0');
+  const mins = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+  const secs = String(seconds % 60).padStart(2, '0');
+  return `${hrs}:${mins}:${secs}`;
+}
+
 app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
+  console.log(`Server running on port ${port}`);
 });

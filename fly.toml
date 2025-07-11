@@ -1,0 +1,21 @@
+app = "vtt-generator"  # replace with your app name on Fly.io
+
+primary_region = "sin"  # choose your region (e.g., sin, iad, fra)
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+
+[[services]]
+  internal_port = 8080
+  protocol = "tcp"
+
+  [[services.ports]]
+    handlers = ["http"]
+    port = 80
+
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port = 443

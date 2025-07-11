@@ -1,8 +1,6 @@
 {
   "name": "vtt-generator",
   "version": "1.0.0",
-  "description": "Generate sprite image and VTT from a video URL",
-  "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
